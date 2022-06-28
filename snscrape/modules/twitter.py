@@ -823,7 +823,8 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 				return
 			tweet = obj['globalObjects']['tweets'][entry['item']['content']['tombstone']['tweet']['id']]
 		else:
-			raise snscrape.base.ScraperException(f'Unable to handle entry {entryId!r}')
+			logging.exception(snscrape.base.ScraperException(f'Unable to handle entry {entryId!r}'))
+			return
 		yield self._tweet_to_tweet(tweet, obj)
 
 	def _get_tweet_id(self, tweet):
