@@ -564,7 +564,7 @@ class _CLIGuestTokenManager(GuestTokenManager):
 		with self._lock:
 			if not os.path.exists(self._file):
 				return None
-			_logger.info(f'Reading guest token from {self._file}')
+			_logger.debug(f'Reading guest token from {self._file}')
 			with open(self._file, 'r') as fp:
 				try:
 					o = json.load(fp)
@@ -575,12 +575,12 @@ class _CLIGuestTokenManager(GuestTokenManager):
 		self._token = o['token']
 		self._setTime = o['setTime']
 		if self._setTime < time.time() - _GUEST_TOKEN_VALIDITY:
-			_logger.info('Guest token expired')
+			_logger.debug('Guest token expired')
 			self.reset()
 
 	def _write(self):
 		with self._lock:
-			_logger.info(f'Writing guest token to {self._file}')
+			_logger.debug(f'Writing guest token to {self._file}')
 			with open(self._file, 'w') as fp:
 				json.dump({'token': self.token, 'setTime': self.setTime}, fp)
 
@@ -603,7 +603,7 @@ class _CLIGuestTokenManager(GuestTokenManager):
 	def reset(self):
 		super().reset()
 		with self._lock:
-			_logger.info(f'Deleting guest token file {self._file}')
+			_logger.debug(f'Deleting guest token file {self._file}')
 			try:
 				os.remove(self._file)
 			except FileNotFoundError:
@@ -646,7 +646,7 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 
 	def _ensure_guest_token(self, url = None):
 		if self._guestTokenManager.token is None:
-			_logger.info('Retrieving guest token')
+			_logger.debug('Retrieving guest token')
 			r = self._get(self._baseUrl if url is None else url, headers = {'User-Agent': self._userAgent}, responseOkCallback = self._check_guest_token_response)
 			if (match := re.search(r'document\.cookie = decodeURIComponent\("gt=(\d+); Max-Age=10800; Domain=\.twitter\.com; Path=/; Secure"\);', r.text)):
 				_logger.debug('Found guest token in HTML')
@@ -656,7 +656,7 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 				self._guestTokenManager.token = r.cookies['gt']
 			if not self._guestTokenManager.token:
 				_logger.debug('No guest token in response')
-				_logger.info('Retrieving guest token via API')
+				_logger.debug('Retrieving guest token via API')
 				r = self._post('https://api.twitter.com/1.1/guest/activate.json', data = b'', headers = self._apiHeaders, responseOkCallback = self._check_guest_token_response)
 				o = r.json()
 				if not o.get('guest_token'):
@@ -716,7 +716,7 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 		stopOnEmptyResponse = False
 		emptyResponsesOnCursor = 0
 		while True:
-			_logger.info(f'Retrieving scroll page {cursor}')
+			_logger.debug(f'Retrieving scroll page {cursor}')
 			obj = self._get_api_data(endpoint, apiType, reqParams)
 			yield obj
 
