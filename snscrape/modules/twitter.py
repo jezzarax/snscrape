@@ -139,6 +139,7 @@ class Coordinates:
 
 @dataclasses.dataclass
 class Place:
+	id: str
 	fullName: str
 	name: str
 	type: str
@@ -226,7 +227,7 @@ class PeriscopeBroadcastCard(Card):
 	description: str
 	state: str
 	totalParticipants: int
-	thumbnailUrl: str
+	thumbnailUrl: typing.Optional[str] = None
 	source: typing.Optional[str] = None
 	broadcaster: typing.Optional['User'] = None
 	siteUser: typing.Optional['User'] = None
@@ -254,10 +255,10 @@ class Event:
 class NewsletterCard(Card):
 	title: str
 	description: str
-	imageUrl: str
 	url: str
 	revueAccountId: int
 	issueCount: int
+	imageUrl: typing.Optional[str] = None
 
 
 @dataclasses.dataclass
@@ -421,9 +422,9 @@ class UnifiedCardApp:
 	type: str
 	id: str
 	title: str
-	category: str
 	countryCode: str
 	url: str
+	category: typing.Optional[str] = None
 	description: typing.Optional[str] = None
 	iconMediumKey: typing.Optional[UnifiedCardMediumKey] = None
 	size: typing.Optional[int] = None
@@ -892,7 +893,7 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 			if (coords := tweet['geo']['coordinates']) and len(coords) == 2:
 				kwargs['coordinates'] = Coordinates(coords[1], coords[0])
 		if tweet.get('place'):
-			kwargs['place'] = Place(tweet['place']['full_name'], tweet['place']['name'], tweet['place']['place_type'], tweet['place']['country'], tweet['place']['country_code'])
+			kwargs['place'] = Place(tweet['place']['id'], tweet['place']['full_name'], tweet['place']['name'], tweet['place']['place_type'], tweet['place']['country'], tweet['place']['country_code'])
 			if 'coordinates' not in kwargs and tweet['place'].get('bounding_box') and (coords := tweet['place']['bounding_box']['coordinates']) and coords[0] and len(coords[0][0]) == 2:
 				# Take the first (longitude, latitude) couple of the "place square"
 				kwargs['coordinates'] = Coordinates(coords[0][0][0], coords[0][0][1])
@@ -1238,11 +1239,16 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 						vKwargs['title'] = var['title']['content']
 						if 'description' in var:
 							vKwargs['description'] = var['description']['content']
-						vKwargs['category'] = var['category']['content']
+						if 'category' in var:
+							vKwargs['category'] = var['category']['content']
 						if (ratings := var['ratings']):
 							vKwargs['ratingAverage'] = var['ratings']['star']
 							vKwargs['ratingCount'] = var['ratings']['count']
 						vKwargs['url'] = f'https://play.google.com/store/apps/details?id={var["id"]}' if var['type'] == 'android_app' else f'https://itunes.apple.com/app/id{var["id"]}'
+						if 'iconMediumKey' in vKwargs and vKwargs['iconMediumKey'] not in kwargs['media']:
+							# https://github.com/JustAnotherArchivist/snscrape/issues/470
+							_logger.warning(f'Tweet {tweetId} contains an app icon medium key {vKwargs["iconMediumKey"]!r} on app {vKwargs["type"]!r}/{vKwargs["id"]!r}, but the corresponding medium is missing; dropping')
+							del vKwargs['iconMediumKey']
 						variants.append(UnifiedCardApp(**vKwargs))
 					kwargs['apps'][k] = variants
 
@@ -1361,7 +1367,7 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 			kwargs['link'] = TextLink(text = entity.get('display_url'), url = entity.get('expanded_url', user['url']), tcourl = user['url'], indices = tuple(entity['indices']))
 		kwargs['profileImageUrl'] = user['profile_image_url_https']
 		kwargs['profileBannerUrl'] = user.get('profile_banner_url')
-		if 'ext' in user and (label := user['ext']['highlightedLabel']['r']['ok'].get('label')):
+		if 'ext' in user and 'highlightedLabel' in user['ext'] and (label := user['ext']['highlightedLabel']['r']['ok'].get('label')):
 			kwargs['label'] = self._user_label_to_user_label(label)
 		return User(**kwargs)
 
@@ -1536,7 +1542,7 @@ class TwitterUserScraper(TwitterSearchScraper):
 
 	@staticmethod
 	def is_valid_username(s):
-		return 1 <= len(s) <= 15 and s.strip(string.ascii_letters + string.digits + '_') == ''
+		return 1 <= len(s) <= 20 and s.strip(string.ascii_letters + string.digits + '_') == ''
 
 	@classmethod
 	def _cli_setup_parser(cls, subparser):
